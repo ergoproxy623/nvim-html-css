@@ -1,13 +1,10 @@
 local Source = {}
 local config = require("cmp.config")
 local a = require("plenary.async")
-local r = require("html-css.remote")
 local l = require("html-css.local")
-local e = require("html-css.embedded")
-local h = require("html-css.hrefs")
 local ts = vim.treesitter
 local tsu = require("nvim-treesitter.ts_utils")
-local parsers = require 'nvim-treesitter.parsers'
+local parsers = require("nvim-treesitter.parsers")
 
 local scan = require("plenary.scandir")
 local rootDir = scan.scan_dir(".", {
@@ -18,8 +15,7 @@ local rootDir = scan.scan_dir(".", {
 	search_pattern = function(entry)
 		local subEntry = entry:sub(3) -- remove ./
 		-- %f[%a]git%f[^%a] -- old regex for matching .git
-		return subEntry:match(".git$") or
-				subEntry:match("package.json") -- if project contains .git folder or package.json its gonna work
+		return subEntry:match(".git$") or subEntry:match("package.json") -- if project contains .git folder or package.json its gonna work
 	end,
 })
 
@@ -57,34 +53,7 @@ function Source:new()
 
 	-- if git_folder_exists == 1 then
 	if vim.tbl_count(rootDir) ~= 0 then
-		self.href_links = h.get_hrefs()
 		self.style_sheets = mrgtbls(self.style_sheets, self.href_links) -- merge lings together
-
-		-- init the remote styles
-		for _, url in ipairs(self.style_sheets) do
-			if url:match(self.isRemote) then
-				a.run(function()
-					r.init(url, function(classes)
-						for _, class in ipairs(classes) do
-							table.insert(self.items, class)
-							table.insert(self.remote_classes, class)
-						end
-					end)
-				end)
-			end
-		end
-
-		-- handle embedded styles
-		a.run(function()
-			e.read_html_files(function(classes, ids)
-				for _, class in ipairs(classes) do
-					table.insert(self.items, class)
-				end
-				for _, id in ipairs(ids) do
-					table.insert(self.ids, id)
-				end
-			end)
-		end)
 
 		-- read all local files on start
 		a.run(function()
@@ -103,21 +72,10 @@ function Source:new()
 end
 
 function Source:complete(_, callback)
+	print("complete")
 	if vim.tbl_count(rootDir) ~= 0 then
 		self.items = {}
 		self.ids = {}
-
-		-- handle embedded styles
-		a.run(function()
-			e.read_html_files(function(classes, ids)
-				for _, class in ipairs(classes) do
-					table.insert(self.items, class)
-				end
-				for _, id in ipairs(ids) do
-					table.insert(self.ids, id)
-				end
-			end)
-		end)
 
 		-- read all local files on start
 		a.run(function()
@@ -149,10 +107,6 @@ function Source:is_available()
 		return false
 	end
 
-	if not vim.tbl_contains(self.option.enable_on, vim.bo.filetype) then
-		return false
-	end
-
 	local bufnr = vim.api.nvim_get_current_buf()
 	local parser = parsers.get_parser(bufnr)
 	local node_at_cursor = tsu.get_node_at_cursor()
@@ -164,11 +118,17 @@ function Source:is_available()
 	local current_node = node_at_cursor
 	local lang = parser:lang()
 
+
 	while current_node do
-		if lang == "html" or lang == "svelte" or lang == "vue" then
+		if lang == "html" or lang == "svelte" or lang == "vue" or lang == "angular" then
 			if current_node:type() == "attribute_name" then
 				local identifier_name = ts.get_node_text(current_node, 0)
-				if identifier_name == "className" or identifier_name == "class" or identifier_name == "id" then
+				if
+					identifier_name == "className"
+					or identifier_name == "class"
+					or identifier_name == "id"
+					or identifier_name == "[id]"
+				then
 					self.current_selector = identifier_name
 					return true
 				end
@@ -179,7 +139,11 @@ function Source:is_available()
 			if current_node:type() == "jsx_attribute" then
 				if current_node:child(0):type() == "property_identifier" then
 					local identifier_name = ts.get_node_text(current_node:child(0), 0)
-					if identifier_name == "className" or identifier_name == "class" or identifier_name == "id" then
+					if
+						identifier_name == "className"
+						or identifier_name == "class"
+						or identifier_name == "id"
+					then
 						self.current_selector = identifier_name
 						return true
 					end
