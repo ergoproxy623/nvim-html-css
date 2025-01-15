@@ -31,7 +31,7 @@ function Source:setup()
 end
 
 function Source:new()
-	self.source_name = "html-css-angular"
+	self.source_name = "html-css"
 	self.isRemote = "^https?://"
 	self.remote_classes = {}
 	self.items = {}
