@@ -21,7 +21,6 @@ local qs = [[
 M.read_local_files = a.wrap(function(file_extensions, cb)
 	local files = {}
 	local fa = { "-a" }
-
 	-- WARNING need to check for performance in larger projects
 	for _, extension in ipairs(file_extensions) do
 		table.insert(fa, "-e")
